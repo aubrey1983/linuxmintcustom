@@ -62,3 +62,7 @@ Notes on best-effort installs:
 - GNOME-Look pages sometimes require clicking through and are not always directly linked to downloadable archives; the script will try to find common archive links on the page, but manual download may be required.
 - GitHub repos are cloned when possible.
 - Font pages are scraped for direct .ttf/.otf links; if a page doesn't expose direct links the fonts may need to be downloaded manually and placed in `~/.local/share/fonts`.
+
+License & CI
+------------
+This project is licensed under the MIT License (see `LICENSE`). A simple GitHub Actions workflow runs ShellCheck on the main script to catch obvious shell issues.
