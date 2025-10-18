@@ -14,4 +14,4 @@ jobs:
       - name: Install ShellCheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Run ShellCheck
-        run: shellcheck mint-aesthetic-setup.sh || true
+        run: shellcheck mint-aesthetic-setup.sh

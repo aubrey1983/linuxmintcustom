@@ -8,6 +8,7 @@ set -euo pipefail
 # Variables you can adjust
 # ----------------
 
+# shellcheck disable=SC2034
 # Names / themes (must exist or you must install them)
 CINNAMON_THEME="Faded-Dream"           # example from Spices theme pages
 GTK_THEME="Arc-Darker"
@@ -166,8 +167,8 @@ download_asset_from_gnomelook() {
   mkdir -p "$out_dir"
   log "Attempting to fetch asset URL from $page_url"
   if command -v wget >/dev/null 2>&1; then
-    local tmpf
-    tmpf="$(mktemp)"
+  local tmpf
+  tmpf=$(mktemp)
     wget -q -O "$tmpf" "$page_url" || return 1
     # Try to find a direct link to common archive types
     local asset
@@ -199,7 +200,8 @@ download_asset_from_gnomelook() {
 install_theme_or_icon_from_url() {
   local url="$1"
   local dest="$2" # ~/.themes or ~/.icons
-  local tmpd="$(mktemp -d)"
+  local tmpd
+  tmpd=$(mktemp -d)
   if [[ "$url" =~ github.com ]]; then
     # try to git clone the repo and copy
     if command -v git >/dev/null 2>&1; then
@@ -218,16 +220,27 @@ install_theme_or_icon_from_url() {
       return $?
     }
     # find the downloaded archive
-    local arc
-    arc="$(find "$tmpd" -maxdepth 1 -type f -regextype posix-extended -regex '.*\.(zip|tar\.gz|tar\.xz|tar\.bz2)' | head -n1)"
+  local arc
+  arc=$(find "$tmpd" -maxdepth 1 -type f -regextype posix-extended -regex '.*\.(zip|tar\.gz|tar\.xz|tar\.bz2)' | head -n1)
     if [ -n "$arc" ]; then
       log "Extracting $arc to $dest"
       mkdir -p "$dest"
       case "$arc" in
-        *.zip) unzip -q "$arc" -d "$tmpd/extracted" || true ;;
-        *.tar.gz) mkdir -p "$tmpd/extracted" && tar -xzf "$arc" -C "$tmpd/extracted" || true ;;
-        *.tar.xz) mkdir -p "$tmpd/extracted" && tar -xJf "$arc" -C "$tmpd/extracted" || true ;;
-        *.tar.bz2) mkdir -p "$tmpd/extracted" && tar -xjf "$arc" -C "$tmpd/extracted" || true ;;
+        *.zip)
+          unzip -q "$arc" -d "$tmpd/extracted" || true
+          ;;
+        *.tar.gz)
+          mkdir -p "$tmpd/extracted"
+          tar -xzf "$arc" -C "$tmpd/extracted" || true
+          ;;
+        *.tar.xz)
+          mkdir -p "$tmpd/extracted"
+          tar -xJf "$arc" -C "$tmpd/extracted" || true
+          ;;
+        *.tar.bz2)
+          mkdir -p "$tmpd/extracted"
+          tar -xjf "$arc" -C "$tmpd/extracted" || true
+          ;;
       esac
       cp -r "$tmpd/extracted"/* "$dest/" || true
       chown -R "$TARGET_USER":"$TARGET_USER" "$dest" || true
