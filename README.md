@@ -19,6 +19,18 @@ Open a terminal and run:
 sudo bash ./mint-aesthetic-setup.sh
 ```
 
+Flags:
+
+- `--dry-run`: shows actions that would be performed without making changes.
+- `--verbose` / `-v`: prints commands as they are executed.
+- `--interactive` / `-i`: prompts for direct URLs when automatic scraping fails.
+
+Example:
+
+```bash
+sudo bash ./mint-aesthetic-setup.sh --dry-run --verbose
+```
+
 Notes:
 - The script tries to detect the real desktop user and run `gsettings` as that user so settings are applied correctly. If you run this as a regular user (no sudo), it will operate on the current user.
 - After running: sign out and back in (or reboot) to fully apply all desktop changes.
