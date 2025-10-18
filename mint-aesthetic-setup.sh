@@ -11,19 +11,25 @@ set -euo pipefail
 # shellcheck disable=SC2034
 # Names / themes (must exist or you must install them)
 CINNAMON_THEME="Faded-Dream"           # example from Spices theme pages
+# shellcheck disable=SC2034
 GTK_THEME="Arc-Darker"
+# shellcheck disable=SC2034
 ICON_THEME="Papirus-Dark"
+# shellcheck disable=SC2034
 CURSOR_THEME="DMZ-White"
 
 FONT_UI="Roboto 11"
+# shellcheck disable=SC2034
 FONT_MONOSPACE="Fira Code 12"
 
 WALLPAPER_URL="https://picsum.photos/1920/1080?grayscale"   # replace with actual wallpaper URL you like
+# shellcheck disable=SC2034
 # By default place wallpapers in the target user's local backgrounds (safer than /usr/share)
 WALLPAPER_DEST="%USER_HOME%/.local/share/backgrounds/custom-aesthetic.jpg"
 
 # Plank theming
 PLANK_THEME_NAME="mcOS-Monterey-BlackLight"  # example name used in one of the tutorial transcripts :contentReference[oaicite:4]{index=4}
+# shellcheck disable=SC2034
 
 # Packages to install
 EXTRA_PKGS=(plank neofetch variety \
@@ -64,10 +70,15 @@ APPLETS_TO_ENABLE=(
   "User Applet"
   "Menu (Cinnamenu)"  # optional alternative menu
 )
+# shellcheck disable=SC2034
 
 PANEL_HEIGHT=30      # px
+# shellcheck disable=SC2034
 PANEL_AUTOHIDE="false"  # "true" or "false"
+# shellcheck disable=SC2034
 PANEL_POSITION="top"    # "top" or "bottom" or "left" / "right"
+
+# (intentional config variables above are suppressed via disable)
 
 # ----------------
 # Helper routines
@@ -135,6 +146,7 @@ install_user_fonts() {
 }
 
 # Install a simple Conky config to the user's config dir if not present
+# shellcheck disable=SC2317
 install_conky_config() {
   local conky_dir="$TARGET_HOME/.config/conky"
   mkdir -p "$conky_dir"
@@ -273,7 +285,7 @@ install_ulauncher_themes() {
   for u in "${ULAUNCHER_URLS[@]}"; do
     log "Installing ulauncher theme from $u"
     if command -v git >/dev/null 2>&1; then
-      tmpd="$(mktemp -d)"
+  tmpd=$(mktemp -d)
       git clone --depth=1 "$u" "$tmpd/repo" || { rm -rf "$tmpd"; log "git clone failed for $u"; continue; }
       # copy repo contents into extensions dir (best-effort)
       cp -r "$tmpd/repo"/* "$dest/" || true
@@ -292,7 +304,7 @@ install_fonts_from_pages() {
   for p in "${FONT_URLS[@]}"; do
     log "Attempting to fetch font assets from $p"
     if command -v wget >/dev/null 2>&1; then
-      tmpf="$(mktemp)"
+  tmpf=$(mktemp)
       wget -q -O "$tmpf" "$p" || true
       # try to find ttf/otf links
       for link in $(grep -Eoi 'https?://[^"'\'' ]+\.(ttf|otf|zip)' "$tmpf" | uniq); do
@@ -326,6 +338,7 @@ EOF
     chown -R "$TARGET_USER":"$TARGET_USER" "$conky_dir" || true
   fi
 }
+ 
 
 is_mint() {
   [[ "$(lsb_release -si 2>/dev/null || echo '')" =~ [Ll]inux.*Mint ]] || return 1
@@ -393,6 +406,7 @@ fi
 
 # Install packages
 apt_install_if_missing "${EXTRA_PKGS[@]}"
+# shellcheck disable=SC2317
 install_conky_config() {
   local conky_dir="$TARGET_HOME/.config/conky"
   mkdir -p "$conky_dir"
@@ -436,6 +450,7 @@ EOF
     chown -R "$TARGET_USER":"$TARGET_USER" "$conky_dir" || true
   fi
 }
+ 
 
 # Try to download a file linked from a GNOME-Look page (best effort):
 download_asset_from_gnomelook() {
@@ -490,7 +505,8 @@ download_asset_from_gnomelook() {
 install_theme_or_icon_from_url() {
   local url="$1"
   local dest="$2" # ~/.themes or ~/.icons
-  local tmpd="$(mktemp -d)"
+  local tmpd
+  tmpd=$(mktemp -d)
   if [[ "$url" =~ github.com ]]; then
     # try to git clone the repo and copy
     if command -v git >/dev/null 2>&1; then
@@ -516,9 +532,18 @@ install_theme_or_icon_from_url() {
       mkdir -p "$dest"
       case "$arc" in
         *.zip) unzip -q "$arc" -d "$tmpd/extracted" || true ;;
-        *.tar.gz) mkdir -p "$tmpd/extracted" && tar -xzf "$arc" -C "$tmpd/extracted" || true ;;
-        *.tar.xz) mkdir -p "$tmpd/extracted" && tar -xJf "$arc" -C "$tmpd/extracted" || true ;;
-        *.tar.bz2) mkdir -p "$tmpd/extracted" && tar -xjf "$arc" -C "$tmpd/extracted" || true ;;
+        *.tar.gz)
+          mkdir -p "$tmpd/extracted"
+          tar -xzf "$arc" -C "$tmpd/extracted" || true
+          ;;
+        *.tar.xz)
+          mkdir -p "$tmpd/extracted"
+          tar -xJf "$arc" -C "$tmpd/extracted" || true
+          ;;
+        *.tar.bz2)
+          mkdir -p "$tmpd/extracted"
+          tar -xjf "$arc" -C "$tmpd/extracted" || true
+          ;;
       esac
       cp -r "$tmpd/extracted"/* "$dest/" || true
       chown -R "$TARGET_USER":"$TARGET_USER" "$dest" || true
