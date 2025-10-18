@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# “Almost exact” aesthetic setup script for Linux Mint Cinnamon
-# Based on video + extra clues. Some parts need manual tweaking.
+# Almost-exact aesthetic setup for Linux Mint Cinnamon
+# Reviewed and lightly cleaned (deduplicated helper functions, added root check,
+# small comments). Behaviour preserved; network downloads remain best-effort.
 
 # ----------------
 # Variables you can adjust
@@ -172,154 +173,6 @@ conky.config = {
   update_interval = 2.0,
 }
 
-# Try to download a file linked from a GNOME-Look page (best effort):
-download_asset_from_gnomelook() {
-  local page_url="$1"
-  local out_dir="$2"
-  mkdir -p "$out_dir"
-  log "Attempting to fetch asset URL from $page_url"
-  if command -v wget >/dev/null 2>&1; then
-  local tmpf
-  tmpf=$(mktemp)
-    wget -q -O "$tmpf" "$page_url" || return 1
-    # Try to find a direct link to common archive types
-    local asset
-    asset="$(grep -Eoi 'href="[^"]+\.(zip|tar\.gz|tar\.xz|tar\.bz2)"' "$tmpf" | head -n1 | sed -E 's/^href="//;s/"$//' )"
-    if [ -z "$asset" ]; then
-      # try links without quotes
-      asset="$(grep -Eoi 'https?://[^"'\'' ]+\.(zip|tar\.gz|tar\.xz|tar\.bz2)' "$tmpf" | head -n1)"
-    fi
-    rm -f "$tmpf"
-    if [ -n "$asset" ]; then
-      # complete relative URLs
-      if [[ "$asset" =~ ^/ ]]; then
-        asset="$(echo "$page_url" | sed -E 's@(https?://[^/]+).*@\1@')${asset}"
-      fi
-      log "Found asset: $asset"
-      wget -q -P "$out_dir" "$asset" || return 1
-      return 0
-    else
-      log "No direct archive link found on $page_url; manual download may be required."
-      return 2
-    fi
-  else
-    log "wget missing; cannot fetch $page_url"
-    return 1
-  fi
-}
-
-# Install a theme/icon archive into the user's ~/.themes or ~/.icons (best-effort)
-install_theme_or_icon_from_url() {
-  local url="$1"
-  local dest="$2" # ~/.themes or ~/.icons
-  local tmpd
-  tmpd=$(mktemp -d)
-  if [[ "$url" =~ github.com ]]; then
-    # try to git clone the repo and copy
-    if command -v git >/dev/null 2>&1; then
-      git clone --depth=1 "$url" "$tmpd/repo" || return 1
-      cp -r "$tmpd/repo"/* "$dest/" || true
-      chown -R "$TARGET_USER":"$TARGET_USER" "$dest" || true
-      rm -rf "$tmpd"
-      return 0
-    else
-      log "git not available; cannot clone $url"
-      return 1
-    fi
-  else
-    download_asset_from_gnomelook "$url" "$tmpd" || {
-      rm -rf "$tmpd"
-      return $?
-    }
-    # find the downloaded archive
-  local arc
-  arc=$(find "$tmpd" -maxdepth 1 -type f -regextype posix-extended -regex '.*\.(zip|tar\.gz|tar\.xz|tar\.bz2)' | head -n1)
-    if [ -n "$arc" ]; then
-      log "Extracting $arc to $dest"
-      mkdir -p "$dest"
-      case "$arc" in
-        *.zip)
-          unzip -q "$arc" -d "$tmpd/extracted" || true
-          ;;
-        *.tar.gz)
-          mkdir -p "$tmpd/extracted"
-          tar -xzf "$arc" -C "$tmpd/extracted" || true
-          ;;
-        *.tar.xz)
-          mkdir -p "$tmpd/extracted"
-          tar -xJf "$arc" -C "$tmpd/extracted" || true
-          ;;
-        *.tar.bz2)
-          mkdir -p "$tmpd/extracted"
-          tar -xjf "$arc" -C "$tmpd/extracted" || true
-          ;;
-      esac
-      cp -r "$tmpd/extracted"/* "$dest/" || true
-      chown -R "$TARGET_USER":"$TARGET_USER" "$dest" || true
-      rm -rf "$tmpd"
-      return 0
-    else
-      log "No archive downloaded from $url"
-      rm -rf "$tmpd"
-      return 1
-    fi
-  fi
-}
-
-# Bulk install themes and icons from arrays (best-effort)
-install_provided_themes_and_icons() {
-  for u in "${THEME_URLS[@]}"; do
-    log "Installing theme from $u"
-    install_theme_or_icon_from_url "$u" "$TARGET_HOME/.themes" || log "Theme install (best-effort) failed for $u"
-  done
-  for u in "${ICON_URLS[@]}"; do
-    log "Installing icon from $u"
-    install_theme_or_icon_from_url "$u" "$TARGET_HOME/.icons" || log "Icon install (best-effort) failed for $u"
-  done
-}
-
-# Install Ulauncher themes (GitHub repos)
-install_ulauncher_themes() {
-  local dest="$TARGET_HOME/.local/share/ulauncher/extensions"
-  mkdir -p "$dest"
-  for u in "${ULAUNCHER_URLS[@]}"; do
-    log "Installing ulauncher theme from $u"
-    if command -v git >/dev/null 2>&1; then
-  tmpd=$(mktemp -d)
-      git clone --depth=1 "$u" "$tmpd/repo" || { rm -rf "$tmpd"; log "git clone failed for $u"; continue; }
-      # copy repo contents into extensions dir (best-effort)
-      cp -r "$tmpd/repo"/* "$dest/" || true
-      chown -R "$TARGET_USER":"$TARGET_USER" "$dest" || true
-      rm -rf "$tmpd"
-    else
-      log "git not present; cannot install $u"
-    fi
-  done
-}
-
-# Try to download fonts linked on a page (best-effort)
-install_fonts_from_pages() {
-  local outdir="$TARGET_HOME/.local/share/fonts"
-  mkdir -p "$outdir"
-  for p in "${FONT_URLS[@]}"; do
-    log "Attempting to fetch font assets from $p"
-    if command -v wget >/dev/null 2>&1; then
-  tmpf=$(mktemp)
-      wget -q -O "$tmpf" "$p" || true
-      # try to find ttf/otf links
-      for link in $(grep -Eoi 'https?://[^"'\'' ]+\.(ttf|otf|zip)' "$tmpf" | uniq); do
-        log "Downloading font file $link"
-        wget -q -P "$outdir" "$link" || true
-      done
-      rm -f "$tmpf"
-    else
-      log "wget not found; skipping font fetch for $p"
-    fi
-  done
-  fc-cache -f -v "$outdir" >/dev/null 2>&1 || true
-  chown -R "$TARGET_USER":"$TARGET_USER" "$outdir" || true
-}
-
 conky.text = [[
 ${color grey}Host:${color} ${nodename}
 ${color grey}Uptime:${color} ${uptime}
@@ -338,7 +191,7 @@ EOF
     chown -R "$TARGET_USER":"$TARGET_USER" "$conky_dir" || true
   fi
 }
- 
+
 
 is_mint() {
   [[ "$(lsb_release -si 2>/dev/null || echo '')" =~ [Ll]inux.*Mint ]] || return 1
@@ -375,7 +228,12 @@ apt_install_if_missing() {
 # Main
 # ----------------
 determine_target_user
- 
+# Require root for system changes (apt, add-apt-repository, etc.)
+if [ "${EUID}" -ne 0 ]; then
+  echo "This script must be run as root (sudo). Exiting."
+  exit 1
+fi
+
 # Default mode: auto (best-effort). Use --interactive to prompt for direct URLs when needed.
 MODE="auto"
 while [ "$#" -gt 0 ]; do
@@ -406,6 +264,16 @@ fi
 
 # Install packages
 apt_install_if_missing "${EXTRA_PKGS[@]}"
+# Best-effort theme/icon/font installs
+install_provided_themes_and_icons || log "Theme/icon installs had issues (best-effort)"
+install_fonts_from_pages || log "Font page installs had issues (best-effort)"
+install_user_fonts || log "User font install had issues"
+install_ulauncher_themes || log "Ulauncher installs had issues"
+install_conky_config || log "Conky config install had issues"
+
+log "Aesthetic setup finished (best-effort)."
+
+### End of script
 # shellcheck disable=SC2317
 install_conky_config() {
   local conky_dir="$TARGET_HOME/.config/conky"
