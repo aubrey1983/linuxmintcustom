@@ -86,6 +86,38 @@ PANEL_POSITION="top"    # "top" or "bottom" or "left" / "right"
 # ----------------
 log() { echo -e "\n==> $*"; }
 
+# Wrapper to run commands respecting dry-run and verbose flags
+DRY_RUN=0
+VERBOSE=0
+run_cmd() {
+  if [ "$DRY_RUN" -eq 1 ]; then
+    if [ "$VERBOSE" -eq 1 ]; then
+      echo "DRY-RUN: $*"
+    fi
+    return 0
+  fi
+  if [ "$VERBOSE" -eq 1 ]; then
+    echo "+ $*"
+  fi
+  "$@"
+}
+
+# Check for required external commands and optionally exit
+check_requirements() {
+  local missing=()
+  for cmd in wget git unzip tar fc-cache lsb_release; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      missing+=("$cmd")
+    fi
+  done
+  if [ ${#missing[@]} -gt 0 ]; then
+    log "Missing required commands: ${missing[*]}"
+    log "You can install them with: sudo apt-get update && sudo apt-get install -y ${missing[*]}"
+    return 1
+  fi
+  return 0
+}
+
 # Determine target user (the desktop user). If the script is run with sudo,
 # SUDO_USER will be set. If not, fall back to the current user.
 determine_target_user() {
@@ -240,7 +272,9 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --interactive|-i) MODE="interactive"; shift;;
     --auto) MODE="auto"; shift;;
-    --help|-h) echo "Usage: $0 [--auto|--interactive]"; exit 0;;
+    --dry-run) DRY_RUN=1; shift;;
+    --verbose|-v) VERBOSE=1; shift;;
+    --help|-h) echo "Usage: $0 [--auto|--interactive] [--dry-run] [--verbose]"; exit 0;;
     *) shift;;
   esac
 done
@@ -250,19 +284,24 @@ if ! is_mint; then
 fi
 
 log "Updating system"
-apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get -y upgrade
+run_cmd apt-get update
+run_cmd env DEBIAN_FRONTEND=noninteractive apt-get -y upgrade
 
 # Add PPAs
 if command -v add-apt-repository >/dev/null 2>&1 ; then
-  add_ppa_if_missing "papirus/papirus"
+  run_cmd add_ppa_if_missing "papirus/papirus"
 else
   log "Installing software-properties-common"
-  apt-get install -y software-properties-common
-  add_ppa_if_missing "papirus/papirus"
+  run_cmd apt-get install -y software-properties-common
+  run_cmd add_ppa_if_missing "papirus/papirus"
 fi
 
 # Install packages
+# ensure required helper commands exist before proceeding (best-effort)
+if ! check_requirements; then
+  log "Warning: some helper commands are missing. The script will continue but may fail when attempting downloads."
+fi
+
 apt_install_if_missing "${EXTRA_PKGS[@]}"
 # Best-effort theme/icon/font installs
 install_provided_themes_and_icons || log "Theme/icon installs had issues (best-effort)"
